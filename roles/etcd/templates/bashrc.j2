@@ -1,0 +1,4 @@
+export ETCDCTL_CA_FILE=/etc/kubernetes/ssl/ca.pem
+export ETCDCTL_CERT_FILE=/etc/kubernetes/ssl/client.pem
+export ETCDCTL_KEY_FILE=/etc/kubernetes/ssl/client-key.pem
+export ETCDCTL_ENDPOINT=https://{{ ansible_default_ipv4.address }}:2379

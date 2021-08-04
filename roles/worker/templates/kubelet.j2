@@ -1,0 +1,17 @@
+###
+# kubernetes kubelet (minion) config
+
+# The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces)
+KUBELET_ADDRESS="--address=0.0.0.0"
+
+# The port for the info server to serve on
+# KUBELET_PORT="--port=10250"
+
+# You may leave this blank to use the actual hostname
+KUBELET_HOSTNAME="--hostname-override={{ ansible_default_ipv4.address }}"
+
+# location of the api-server
+KUBELET_API_SERVER="--api-servers=https://{{ masterserver }}:4443"
+
+# Add your own!
+KUBELET_ARGS="--config=/etc/kubernetes/manifests --network-plugin-dir=/etc/kubernetes/cni/net.d --register-node=true --allow-privileged=true --cluster-dns=10.3.0.10 --cluster-domain=cluster.local --kubeconfig=/etc/kubernetes/worker-kubeconfig.yaml --tls-cert-file=/etc/kubernetes/ssl/worker.pem --tls-private-key-file=/etc/kubernetes/ssl/worker-key.pem"

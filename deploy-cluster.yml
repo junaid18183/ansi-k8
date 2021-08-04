@@ -1,0 +1,100 @@
+---
+- hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - debug : msg="Installing and configuring the kubernetes cluster on SLES hosts"
+
+    - name : check if /usr/local/bin/cfssl exist
+      local_action: stat path="/usr/local/bin/cfssl"
+      register: cfssl
+
+    - name : check if /usr/local/bin/cfssljson
+      local_action: stat path="/usr/local/bin/cfssljson"
+      register: cfssljson
+
+    - name: install cfssl
+      local_action: shell curl -s -L -o /usr/local/bin/cfssl https://pkg.cfssl.org/R1.1/cfssl_linux-amd64 && sudo chmod +x /usr/local/bin/cfssl
+      when : cfssl.stat.exists == false
+
+    - name: install cfssljson
+      local_action: shell curl -s -L -o /usr/local/bin/cfssljson https://pkg.cfssl.org/R1.1/cfssljson_linux-amd64 && sudo chmod +x /usr/local/bin/cfssljson
+      when : cfssljson.stat.exists == false
+
+    - name : check if ca.pem exist
+      local_action: stat path="./files/secrets/ca.pem"
+      register: ca
+
+    - name : generate the ca certifictes
+      local_action : command files/cfssl/generate_ca.sh
+      when : ca.stat.exists == false
+
+- hosts: etcd
+  gather_facts: true
+  become: true
+  pre_tasks:
+    - name : generate the etcd certifictes
+      local_action : command files/cfssl/generate_server.sh k8s_etcd {{ ansible_default_ipv4.address }}
+
+    - name : copy generated certificates to etcd
+      local_action : shell cp files/secrets/{{ item}} roles/etcd/files/
+      with_items:
+        - ca.pem
+        - k8s_etcd.pem
+        - k8s_etcd-key.pem
+
+  roles:
+    - etcd
+
+- hosts: master
+  gather_facts: true
+  become: true
+
+  pre_tasks:
+    - name : generate the master certifictes
+      local_action : command files/cfssl/generate_server.sh k8s_master {{ ansible_default_ipv4.address }},10.3.0.1,kubernetes.default,kubernetes,{{inventory_hostname}}
+    - name : generate the client certifictes
+      local_action : command files/cfssl/generate_client.sh k8s_master
+
+    - name : copy generated certificates to master role/files
+      local_action : shell cp files/secrets/{{ item}} roles/master/files/
+      with_items:
+        - ca.pem
+        - k8s_master.pem
+        - k8s_master-key.pem
+        - client-k8s_master.pem
+        - client-k8s_master-key.pem
+
+  roles:
+    - { role: master }
+    #- { role: master ,etcdserver: "{{ groups['etcd'][0] }}" }
+
+- hosts: workers
+  gather_facts: false
+  become: true
+
+  pre_tasks:
+    - name : generate the ca certifictes
+      local_action : command files/cfssl/generate_ca.sh
+      when : ca.stat.exists == false
+
+    - name : generate the client certifictes
+      local_action : command files/cfssl/generate_client.sh k8s_worker
+
+    - name : copy generated certificates to master role/files
+      local_action : shell cp files/secrets/{{ item}} roles/worker/files/
+      with_items:
+        - ca.pem
+        - client-k8s_worker.pem
+        - client-k8s_worker-key.pem
+
+  roles:
+    - { role: worker }
+    #- { role: worker , masterserver: "{{ groups['masters'][0] }}" }
+
+- hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name : generate the admin certificates
+      local_action : command files/cfssl/generate_admin.sh

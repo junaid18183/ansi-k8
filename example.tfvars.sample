@@ -1,0 +1,18 @@
+access_key = "XXXXXXXXXX"
+secret_key = "YYYYYYYYYY"
+region = "us-west-2"
+ssh_key_name = "juned-reantrainee"
+number_of_workers = "0"
+master-instance_type = "t2.small"
+worker-instance_type = "t2.small"
+instance_profile = "junedKubeMaster"
+
+#us-east-1
+#aws_security_group_id = "sg-eb22ef96"
+#aws_vpc_security_group_id = "sg-eb22ef96"
+#aws_subnet_id = "subnet-de053af6"
+
+#us-west-2
+aws_security_group_id = "sg-7264b70a"
+aws_vpc_security_group_id = "sg-7264b70a"
+aws_subnet_id = "subnet-7b010f3d"

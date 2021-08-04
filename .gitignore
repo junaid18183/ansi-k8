@@ -1,0 +1,8 @@
+*.retry
+**.pem
+**secrets
+terraform.tfstate
+terraform.tfstate.*
+*.tfvars
+notes
+.dontpush/*

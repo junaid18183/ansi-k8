@@ -1,0 +1,72 @@
+---
+# tasks file for etcd
+- zypper_repository:
+    repo: "{{ REPOPATH }}"
+    name: Virtualization_containers_12
+    state: present
+    auto_import_keys: yes
+    runrefresh: yes
+  become: true
+
+# Install 'packages"
+- zypper: name={{item}} state=present
+  with_items:
+   - etcd
+   - etcdctl
+
+#Create the secret directory
+- name: create etcd cert dir
+  file:
+    path: /etc/kubernetes/ssl/
+    group: root
+    state: directory
+    owner: root
+    recurse: yes
+
+#Generate certificate is done in main playbook
+
+#Copy certificates
+- name: copy ca.pem
+  copy:
+    src: "ca.pem"
+    dest: "/etc/kubernetes/ssl/ca.pem"
+    owner: etcd
+
+- name: copy etcd.pem
+  copy:
+    src: "k8s_etcd.pem"
+    dest: "/etc/kubernetes/ssl/etcd.pem"
+    owner: etcd
+
+- name: copy etcd-key
+  copy:
+    src: "k8s_etcd-key.pem"
+    dest: "/etc/kubernetes/ssl/etcd-key.pem"
+    owner: etcd
+
+#Deploy the configuration template
+- name: write etcd config at /etc/sysconfig/etcd
+  template:
+    src: "etcd.j2"
+    dest: "/etc/sysconfig/etcd"
+    backup: yes
+  run_once: yes
+
+#start the service and enable 
+- systemd:
+    name: etcd
+    state: started
+    enabled: true
+
+#generate the etcdctl environment variables
+- name: write etcdctl environments in root bashrc
+  template:
+    src: "bashrc.j2"
+    dest: "/home/ec2-user/.bashrc"
+    backup: yes
+
+- name: write etcdctl environments in root bashrc
+  template:
+    src: "bashrc.j2"
+    dest: "/root/.bashrc"
+    backup: yes

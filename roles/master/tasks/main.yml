@@ -1,0 +1,160 @@
+---
+- zypper_repository:
+    repo: "{{ REPOPATH }}"
+    name: Virtualization_containers_12
+    auto_import_keys: yes
+    state: present
+    runrefresh: yes
+
+#Download the netfilter.repo, needed for conntrack-tools, conntrack-tools is needed for kubernetes-node
+- zypper_repository:
+    repo: 'http://download.opensuse.org/repositories/security:netfilter/SLE_12/'
+    name: All-the-firewall-things-SLE_12
+    auto_import_keys: yes
+    state: present
+    runrefresh: yes
+
+- service:
+    name: docker
+    state: started
+    enabled: true
+
+# Install 'packages"
+- zypper: name={{item}} state=present
+  with_items:
+   - kubernetes-client
+   - kubernetes-common
+   - kubernetes-extra
+   - kubernetes-kubelet
+   - kubernetes-master
+   - kubernetes-node
+   - kubernetes-node-cni
+   - kubernetes-node-image-pause
+   - kubernetes-addons-flannel
+   - kubernetes-addons-kubedns
+
+
+- name: create /etc/kubernetes/ssl dir
+  file:
+    path: /etc/kubernetes/ssl
+    group: root
+    state: directory
+    owner: root
+    recurse: yes
+
+- name: create /etc/ssl/etcd/ dir
+  file:
+    path: /etc/ssl/etcd/
+    group: root
+    state: directory
+    owner: root
+    recurse: yes
+
+#generate the certificates, thats part of prescript
+#copy the certificates
+- name: copy ca.pem
+  copy:
+    src: "ca.pem"
+    dest: "/etc/kubernetes/ssl/ca.pem"
+    owner: root
+    group: root
+
+- name: copy k8s_master.pem
+  copy:
+    src: "k8s_master.pem"
+    dest: "/etc/kubernetes/ssl/apiserver.pem"
+    owner: kube
+    group: kube
+
+- name: copy k8s_master-key.pem
+  copy:
+    src: "k8s_master-key.pem"
+    dest: "/etc/kubernetes/ssl/apiserver-key.pem"
+    owner: kube
+    group: kube
+
+- name: copy client-k8s_master.pem
+  copy:
+    src: "client-k8s_master.pem"
+    dest: "/etc/kubernetes/ssl/client.pem"
+    owner: kube
+    group: kube
+
+
+- name: copy client-k8s_master-key.pem
+  copy:
+    src: "client-k8s_master-key.pem"
+    dest: "/etc/kubernetes/ssl/client-key.pem"
+    owner: kube
+    group: kube
+##########################################################
+- name: copy client-k8s_master.pem to etc/ssl
+  copy:
+    src: "client-k8s_master.pem"
+    dest: "/etc/ssl/etcd/client.pem"
+
+
+- name: copy client-k8s_master-key.pem to etc/ssl
+  copy:
+    src: "client-k8s_master-key.pem"
+    dest: "/etc/ssl/etcd/client-key.pem"
+
+- name: copy ca.pem to  etc/ssl
+  copy:
+    src: "ca.pem"
+    dest: "/etc/ssl/etcd/ca.pem"
+
+
+#fix apiserver configurations
+- name: write apiserver config at /etc/kubernetes/
+  template:
+    src: "apiserver.j2"
+    dest: "/etc/kubernetes/apiserver"
+    backup: yes
+  run_once: yes
+
+
+
+#fix kube-controller-manager config 
+- name: write controller-manager config at /etc/kubernetes/
+  template:
+    src: "controller-manager.j2"
+    dest: "/etc/kubernetes/controller-manager"
+    backup: yes
+  run_once: yes
+
+#fix kubelet
+- name: write kubelet config at /etc/kubernetes/
+  template:
+    src: "kubelet.j2"
+    dest: "/etc/kubernetes/kubelet"
+    backup: yes
+  run_once: yes
+
+
+#start services
+- name : start service
+  service : name={{item}} state=started enabled=yes
+  with_items:
+    - kubelet
+    - kube-apiserver
+    - kube-controller-manager
+    - kube-scheduler
+    - kube-proxy
+
+#Install cluser component
+- name : copy dashboard templete
+  template:
+    src: "kubernetes-dashboard.yaml.j2"
+    dest: "/etc/kubernetes/addons/kubernetes-dashboard.yaml"
+    backup: no
+  run_once: yes
+
+- name : Install Flannel
+  shell : /usr/bin/kubectl create -f /etc/kubernetes/addons/flannel.yml
+
+- name : Install KubeDNS
+  shell : /usr/bin/kubectl create -f /etc/kubernetes/addons/kubedns.yml
+
+- name : Install Dashboard
+  shell : /usr/bin/kubectl create -f /etc/kubernetes/addons/kubernetes-dashboard.yaml

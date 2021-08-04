@@ -1,0 +1,118 @@
+---
+- zypper_repository:
+    repo: "{{ REPOPATH }}"
+    name: Virtualization_containers_12
+    auto_import_keys: yes
+    state: present
+    runrefresh: yes
+
+#Download the netfilter.repo, needed for conntrack-tools, conntrack-tools is needed for kubernetes-node
+- zypper_repository:
+    repo: 'http://download.opensuse.org/repositories/security:netfilter/SLE_12/'
+    name: All-the-firewall-things-SLE_12
+    auto_import_keys: yes
+    state: present
+    runrefresh: yes
+
+- service:
+    name: docker
+    state: started
+    enabled: true
+
+# Install 'packages"
+- zypper: name={{item}} state=present
+  with_items:
+   - kubernetes-client
+   - kubernetes-common
+   - kubernetes-kubelet
+   - kubernetes-node
+   - kubernetes-node-cni
+   - kubernetes-node-image-pause
+   - kubernetes-addons-flannel
+
+
+- name: create /etc/kubernetes/ssl  dir
+  file:
+    path: /etc/kubernetes/ssl
+    group: root
+    state: directory
+    owner: root
+    recurse: yes
+
+- name: create /etc/ssl/etcd/ dir
+  file:
+    path: /etc/ssl/etcd/
+    group: root
+    state: directory
+    owner: root
+    recurse: yes
+
+#generate the certificates, thats part of prescript
+#copy the certificates
+- name: copy ca.pem
+  copy:
+    src: "ca.pem"
+    dest: "/etc/kubernetes/ssl/ca.pem"
+    owner: root
+    group: root
+
+- name: copy client-k8s_worker.pem
+  copy:
+    src: "client-k8s_worker.pem"
+    dest: "/etc/kubernetes/ssl/worker.pem"
+    owner: kube
+    group: kube
+
+- name: copy client-k8s_worker-key.pem
+  copy:
+    src: "client-k8s_worker-key.pem"
+    dest: "/etc/kubernetes/ssl/worker-key.pem"
+    owner: kube
+    group: kube
+
+##########################################################
+- name: copy client-k8s_worker.pem to etc/ssl
+  copy:
+    src: "client-k8s_worker.pem"
+    dest: "/etc/ssl/etcd/worker"
+
+
+- name: copy client-k8s_worker-key.pem to etc/ssl
+  copy:
+    src: "client-k8s_worker-key.pem"
+    dest: "/etc/ssl/etcd/worker-key.pem"
+
+- name: copy ca.pem to  etc/ssl
+  copy:
+    src: "ca.pem"
+    dest: "/etc/ssl/etcd/ca.pem"
+
+#fix default config 
+- name: write default config at /etc/kubernetes/config
+  template:
+    src: "config.j2"
+    dest: "/etc/kubernetes/config"
+    backup: yes
+  run_once: yes
+
+#fix proxy config
+- name: write proxy config at /etc/kubernetes/proxy
+  template:
+    src: "proxy.j2"
+    dest: "/etc/kubernetes/proxy"
+    backup: yes
+  run_once: yes
+
+
+#add worker-kubeconfig.yaml 
+- name: write worker-kubeconfig.yaml at /etc/kubernetes/worker-kubeconfig.yaml
+  template:
+    src: "worker-kubeconfig.j2"
+    dest: "/etc/kubernetes/worker-kubeconfig.yaml"
+    backup: yes
+
+- name : start service
+  service : name={{item}} state=started enabled=yes
+  with_items:
+    - kubelet
+    - kube-proxy

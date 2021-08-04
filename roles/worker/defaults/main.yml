@@ -1,0 +1,3 @@
+---
+# defaults file for worker
+masterserver: '127.0.0.1'

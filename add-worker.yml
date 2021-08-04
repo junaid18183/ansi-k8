@@ -1,0 +1,25 @@
+- hosts: workers
+  gather_facts: false
+  become: true
+
+  pre_tasks:
+    - name : check if ca.pem exist
+      local_action: stat path="./files/secrets/ca.pem"
+      register: ca
+
+    - name : generate the ca certifictes
+      local_action : command files/cfssl/generate_ca.sh
+      when : ca.stat.exists == false
+
+    - name : generate the client certifictes
+      local_action : command files/cfssl/generate_client.sh k8s_worker
+
+    - name : copy generated certificates to master role/files
+      local_action : shell cp files/secrets/{{ item}} roles/worker/files/
+      with_items:
+        - ca.pem
+        - client-k8s_worker.pem
+        - client-k8s_worker-key.pem
+
+  roles:
+    - { role: worker }
